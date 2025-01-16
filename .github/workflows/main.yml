@@ -1,0 +1,44 @@
+name: CI
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [prod]  # Define environments
+    env:
+      PROVAR_HOME: ${{ github.workspace }}/ProvarHome
+      PROVARTEST_PROJECT: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-java@v1
+        with:
+          java-version: 1.21
+      - name: Run build
+        env:
+          ENV: ${{ matrix.environment }}  # Use environment from matrix
+        run: |
+          mkdir $GITHUB_WORKSPACE/ProvarHome
+          curl -O https://download.provartesting.com/latest/Provar_ANT_latest.zip
+          unzip -o Provar_ANT_latest.zip -d ProvarHome
+          rm Provar_ANT_latest.zip
+          sudo apt-get update && sudo apt-get upgrade
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee -a /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get -y install google-chrome-stable
+          sudo add-apt-repository ppa:mozillateam/firefox-next && sudo apt install firefox
+          echo $PROVAR_HOME
+          cd $GITHUB_WORKSPACE/ANT
+          xvfb-run ant -f buildtttt.xml -Denv=${{ matrix.environment }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Execution Report - ${{ matrix.environment }}
+          path: ${{ github.workspace }}/ANT/Results/*
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: Execution Report - ${{ matrix.environment }}
+          path: ${{ github.workspace }}/ANT/Results/*
